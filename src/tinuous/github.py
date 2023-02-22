@@ -234,9 +234,9 @@ class GitHubActions(CISystem):
             if rel.draft:
                 log.info("Release %s is draft; skipping", rel.tag_name)
                 continue
-            if rel.prerelease:
-                log.info("Release %s is prerelease; skipping", rel.tag_name)
-                continue
+            # if rel.prerelease:
+            #     log.info("Release %s is prerelease; skipping", rel.tag_name)
+            #     continue
             ts = ensure_aware(rel.published_at)
             if ts <= self.since or (self.until is not None and ts > self.until):
                 continue
