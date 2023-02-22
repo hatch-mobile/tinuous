@@ -206,6 +206,7 @@ class BuildAsset(ABC, BaseModel):
     build_commit: str
     commit: Optional[str]
     number: int
+    attempt: int
     status: str
 
     class Config:
@@ -229,6 +230,7 @@ class BuildAsset(ABC, BaseModel):
             "build_commit": self.build_commit,
             "commit": commit,
             "number": str(self.number),
+            "attempt": str(self.attempt),
             "status": self.status,
             "common_status": COMMON_STATUS_MAP[self.status],
         }

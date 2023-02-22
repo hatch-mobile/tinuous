@@ -124,11 +124,12 @@ class GitHubActions(CISystem):
                     log.info("Run %s not completed; skipping", run.run_number)
                     self.register_build(ts, False)
                 else:
-                    log.info("Found run %s", run.run_number)
+                    log.info("Found run %s (Attempt #%s)", run.run_number, run.run_attempt)
                     self.register_build(ts, True)
                     if run_event in event_types:
                         event_id = self.get_event_id(run, run_event)
                         if logs:
+                            log.info("run info: 1 %s, 2 %s, 3 %s, 4 %s, 5 %s", self.extra_client, wf, run, run_event, event_id)
                             yield GHABuildLog.from_workflow_run(
                                 self.extra_client, wf, run, run_event, event_id
                             )
@@ -143,6 +144,17 @@ class GitHubActions(CISystem):
                                     name,
                                     download_url,
                                 )
+
+                        currentRunAttempt = run.run_attempt
+
+                        # fetch previous attempt logs
+                        while currentRunAttempt > 1:
+                            currentRunAttempt -= 1
+                            log.info("Not the first attempt, retrieving prior attempt")
+                            yield GHABuildLog.from_prev_workflow_run(
+                                self.extra_client, wf, run, run_event, event_id, currentRunAttempt
+                            )
+
                     else:
                         log.info("Event type is %r; skipping", run.event)
 
@@ -274,6 +286,50 @@ class GHAAsset(BuildAsset):
 
 class GHABuildLog(GHAAsset, BuildLog):
     logs_url: str
+    attempt: str
+
+    @classmethod
+    def from_prev_workflow_run(
+        cls,
+        client: APIClient,
+        workflow: Workflow,
+        run: WorkflowRun,
+        event_type: EventType,
+        event_id: str,
+        attempt: int
+    ) -> "GHABuildLog":
+        # log.info(
+        #     "1: %s, 2: %s, 3: %s, 4: %s, 5: %s, 6: %s, 7: %s, 8: %s, 9: %s, 10: %s, 11: %s, 12: %s, 13: %s",
+        #     client,
+        #     run.logs_url.replace("/logs", "/attempts/" + str(attempt) +"/logs"),
+        #     run.created_at,
+        #     event_type,
+        #     event_id,
+        #     run.head_sha,
+        #     run.head_sha,
+        #     workflow.name,
+        #     workflow.path.split("/")[-1],
+        #     run.run_number,
+        #     attempt,
+        #     run.id,
+        #     run.conclusion or "cancelled" # None causes downstream exception
+        # )
+        
+        return cls(
+            client=client,
+            logs_url=run.logs_url.replace("/logs", "/attempts/" + str(attempt) +"/logs"),
+            created_at=ensure_aware(run.created_at),
+            event_type=event_type,
+            event_id=event_id,
+            build_commit=run.head_sha,
+            commit=run.head_sha,
+            workflow_name=workflow.name,
+            workflow_file=workflow.path.split("/")[-1],
+            number=run.run_number,
+            attempt=attempt,
+            run_id=run.id,
+            status=run.conclusion or "cancelled" # None causes downstream exception,
+        )
 
     @classmethod
     def from_workflow_run(
@@ -295,26 +351,29 @@ class GHABuildLog(GHAAsset, BuildLog):
             workflow_name=workflow.name,
             workflow_file=workflow.path.split("/")[-1],
             number=run.run_number,
+            attempt=run.run_attempt,
             run_id=run.id,
-            status=run.conclusion,
+            status=run.conclusion or "cancelled" # None causes downstream exception,
         )
 
     def download(self, path: Path) -> List[Path]:
         path.mkdir(parents=True, exist_ok=True)
         if any(path.iterdir()):
             log.info(
-                "Logs for %s (%s) #%s already downloaded to %s; skipping",
+                "Logs for %s (%s) #%s (attempt #%s) already downloaded to %s; skipping",
                 self.workflow_file,
                 self.workflow_name,
                 self.number,
+                self.attempt,
                 path,
             )
             return []
         log.info(
-            "Downloading logs for %s (%s) #%s to %s",
+            "Downloading logs for %s (%s) #%s (attempt #%s) to %s",
             self.workflow_file,
             self.workflow_name,
             self.number,
+            self.attempt,
             path,
         )
         try:
@@ -357,6 +416,7 @@ class GHAArtifact(GHAAsset, Artifact):
             workflow_name=workflow.name,
             workflow_file=workflow.path.split("/")[-1],
             number=run.run_number,
+            attempt=run.run_attempt,
             run_id=run.id,
             status=run.conclusion,
             name=name,
@@ -368,20 +428,22 @@ class GHAArtifact(GHAAsset, Artifact):
         target_dir.mkdir(parents=True, exist_ok=True)
         if any(target_dir.iterdir()):
             log.info(
-                "Asset %s from %s (%s) #%s already downloaded to %s; skipping",
+                "Asset %s from %s (%s) #%s (attempt #%s) already downloaded to %s; skipping",
                 self.name,
                 self.workflow_file,
                 self.workflow_name,
                 self.number,
+                self.attempt,
                 path,
             )
             return []
         log.info(
-            "Downloading asset %s for %s (%s) #%s to %s",
+            "Downloading asset %s for %s (%s) #%s (attempt #%s) to %s",
             self.name,
             self.workflow_file,
             self.workflow_name,
             self.number,
+            self.attempt,
             path,
         )
         self.client.download_zipfile(self.download_url, target_dir)
