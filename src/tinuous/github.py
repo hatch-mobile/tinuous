@@ -120,9 +120,9 @@ class GitHubActions(CISystem):
                 ts = ensure_aware(run.created_at)
                 if self.until is not None and ts > self.until:
                     log.info("Run %s is too new; skipping", run.run_number)
-                elif run.status != "completed":
-                    log.info("Run %s not completed; skipping", run.run_number)
-                    self.register_build(ts, False)
+                # elif run.status != "completed":
+                #     log.info("Run %s not completed; skipping", run.run_number)
+                #     self.register_build(ts, False)
                 else:
                     log.info("Found run %s (Attempt #%s)", run.run_number, run.run_attempt)
                     self.register_build(ts, True)
