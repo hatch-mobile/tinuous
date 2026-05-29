@@ -46,6 +46,7 @@ class EventType(Enum):
     PUSH = "push"
     PULL_REQUEST = "pr"
     MANUAL = "manual"
+    MERGE_GROUP = "merge_group"
 
     @classmethod
     def from_gh_event(cls, gh_event: str) -> Optional["EventType"]:
@@ -56,6 +57,7 @@ class EventType(Enum):
             "pull_request_target": cls.PULL_REQUEST,
             "workflow_dispatch": cls.MANUAL,
             "repository_dispatch": cls.MANUAL,
+            "merge_group": cls.MERGE_GROUP,
         }.get(gh_event)
 
     @classmethod

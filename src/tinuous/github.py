@@ -205,6 +205,9 @@ class GitHubActions(CISystem):
                             sleep(delay)
                 self.hash2pr[run.head_sha] = pr
                 return pr
+        elif event_type is EventType.MERGE_GROUP:
+            # head_branch looks like 'gh-readonly-queue/main/pr-2481-<sha>'; sanitized into {type_id}.
+            return run.head_branch
         else:
             raise AssertionError(f"Unhandled EventType: {event_type!r}")
 
